@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const verifyToken = require('../middlewares/verifyToken');
 const initialUsers = require('../fixtures/users.json');
+const jwSecret = process.env.JWT_SECRET
 
 // ⚠️ 寫作業前先 `npm start` 打開 http://localhost:3000/docs 看 Swagger UI 的完整規格。
 // 💡 /* 作答區 ... */ 是答題提示區，取消註解後填入你的程式碼。
@@ -32,6 +33,23 @@ const router = express.Router();
 /* 作答區
 router.METHOD('PATH', async (req, res) => { ... });
 */
+router.post('/register',async (req, res)=>{
+    const { email, password } = req.body
+    
+    if( !email || !password ){
+       return res.status(400).json({ status: 'false', message: "請填寫 email 與 password" })
+    }
+
+    if(users.findIndex(e=> e.email === email) !== -1){
+        return res.status(400).json({ status: 'false', message: "email 重複註冊" })
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10)
+    users.push({ id:nextId++, email, password:passwordHash})
+
+    res.status(201).json({ status: 'success', message: '註冊成功' })
+})
+
 
 // ───────────────────────────────────────────────────────────
 // TODO 任務三：POST /login
@@ -49,6 +67,22 @@ router.METHOD('PATH', async (req, res) => { ... });
 /* 作答區
 router.METHOD('PATH', async (req, res) => { ... });
 */
+router.post('/login',async (req, res)=>{
+    const { email, password } = req.body
+    const user = users.find(e => e.email === email)
+
+    if(!user || !(await bcrypt.compare(password,user.password))){
+       return res.status(401).json({ status: 'false', message: '帳號或密碼錯誤' })
+    }
+
+    const token = jwt.sign( 
+        { userId: user.id, email: user.email },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+    )
+
+    res.status(200).json({ status: 'success', token })
+})
 
 // ───────────────────────────────────────────────────────────
 // TODO 任務四：GET /me（受保護）
@@ -60,5 +94,8 @@ router.METHOD('PATH', async (req, res) => { ... });
 /* 作答區
 router.METHOD('PATH', middleware, (req, res) => { ... });
 */
+router.get('/me',verifyToken,(req, res)=>{
+    res.status(200).json({ status: 'success', user:req.user })
+})
 
 module.exports = router;
